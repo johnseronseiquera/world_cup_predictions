@@ -1,4 +1,4 @@
-# World Cup match predictor
+# 2026 FIFA World Cup match predictor
 
 A small, readable model that predicts the outcome of a single 2026 World Cup match — win / draw / loss probabilities, plus a chart you can actually post. You give it two teams, it does the rest.
 
