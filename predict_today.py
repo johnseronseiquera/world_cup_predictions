@@ -127,8 +127,8 @@ def normalize_country(name):
     return NAME_MAP.get(name, name) if isinstance(name, str) else name
 
 
-def load_results():
-    r = fetch_results()
+def load_results(sync: bool = True):
+    r = fetch_results(sync=sync)
     r["home_team"] = r["home_team"].map(normalize_country)
     r["away_team"] = r["away_team"].map(normalize_country)
     r["date"] = pd.to_datetime(r["date"])

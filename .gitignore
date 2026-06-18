@@ -9,6 +9,7 @@ predictions/
 
 # auto-downloaded on first run (large, ~5MB)
 data_cache/results.csv
+data_cache/player_club_stats.csv
 
 # os junk
 .DS_Store
