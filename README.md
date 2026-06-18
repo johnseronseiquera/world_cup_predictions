@@ -16,7 +16,8 @@ python sync_player_stats.py         # refresh club stats
 python import_fbref.py --dir data_cache/fbref_imports   # optional FBref import
 python predict_today.py "Spain" "Cabo Verde"            # single match
 python predict_slate.py 2026-06-19                      # all matches on a date
-python score_predictions.py           # score logged picks vs actual results
+python score_predictions.py           # fill in actual results in the prediction log
+python review_predictions.py          # sync, score, and print matchday report
 python backtest_goals.py              # validate goal model on past World Cups
 ```
 
@@ -54,6 +55,7 @@ Squad lists live in `data_cache/squads_2026.csv` (bootstrap with `python bootstr
 | `import_fbref.py` | Bulk-import FBref CSV exports |
 | `bootstrap_squads.py` | Build squad list from recent intl scorers |
 | `score_predictions.py` | Fill in actual results in the prediction log |
+| `review_predictions.py` | Sync results, score picks, print matchday report |
 | `backtest_goals.py` | Backtest Poisson goals on WC 2018/2022 |
 | `inspect_data.py` | Summarize international_results CSVs |
 
