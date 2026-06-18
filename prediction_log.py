@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import log_loss
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOG_PATH = SCRIPT_DIR / "predictions" / "prediction_log.csv"
@@ -185,8 +186,6 @@ def score_predictions(results: pd.DataFrame | None = None) -> pd.DataFrame:
             label = 2
 
         proba = np.array([[row["p_home"], row["p_draw"], row["p_away"]]])
-        from sklearn.metrics import log_loss
-
         ll = float(log_loss([label], proba, labels=[0, 1, 2]))
         updated = row.copy()
         updated["actual_home_score"] = home_score

@@ -5,9 +5,21 @@ goal_prediction.py — expected goals and most likely scoreline (Poisson)
 from __future__ import annotations
 
 import math
+from typing import TypedDict
 
 import numpy as np
 import pandas as pd
+
+
+class GoalPrediction(TypedDict):
+    exp_home_goals: float
+    exp_away_goals: float
+    pred_home_goals: int
+    pred_away_goals: int
+    scoreline_prob: float
+    over_2_5_prob: float
+    btts_prob: float
+    top_scores: list[tuple[int, int, float]]
 
 INTL_AVG_GOALS = 1.35
 MAX_GOALS = 5
@@ -54,7 +66,7 @@ def predict_goals(
     home_elo: float = 1500.0,
     away_elo: float = 1500.0,
     elo: dict[str, float] | None = None,
-) -> dict[str, float | tuple[int, int]]:
+) -> GoalPrediction:
     h_gf, h_ga = team_goal_rates(long, home, asof, elo)
     a_gf, a_ga = team_goal_rates(long, away, asof, elo)
 

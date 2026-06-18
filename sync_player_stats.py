@@ -67,10 +67,11 @@ def sync_player_stats() -> pd.DataFrame:
         **{col: 0.0 for col in CLUB_STAT_COLUMNS},
         source="template",
     )
-    existing = set(zip(stats["player_name"], stats["team"]))
-    missing = squad_rows[
-        ~squad_rows.apply(lambda row: (row["player_name"], row["team"]) in existing, axis=1)
-    ]
+    existing = stats[["player_name", "team"]].drop_duplicates()
+    missing = squad_rows.merge(
+        existing, on=["player_name", "team"], how="left", indicator=True
+    )
+    missing = missing[missing["_merge"] == "left_only"].drop(columns="_merge")
     stats = pd.concat([stats, missing], ignore_index=True)
 
     CLUB_STATS_PATH.parent.mkdir(parents=True, exist_ok=True)
