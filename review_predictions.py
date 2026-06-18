@@ -33,15 +33,28 @@ def _dedupe_log(log: pd.DataFrame) -> pd.DataFrame:
     return log.drop(columns=["_sort_scored", "_sort_time"])
 
 
-def _goal_metrics(row: pd.Series) -> dict[str, float | bool | None]:
-    if pd.isna(row.get("actual_home_score")) or pd.isna(row.get("pred_home_goals")):
-        return {"exact_score": None, "home_mae": None, "away_mae": None, "total_mae": None}
-    ah = float(row["actual_home_score"])
-    aa = float(row["actual_away_score"])
+def _xg_values(row: pd.Series) -> tuple[float, float] | None:
+    if pd.isna(row.get("pred_home_goals")) or pd.isna(row.get("pred_away_goals")):
+        return None
     ph = float(row["pred_home_goals"])
     pa = float(row["pred_away_goals"])
     eh = float(row["exp_home_goals"]) if pd.notna(row.get("exp_home_goals")) else ph
     ea = float(row["exp_away_goals"]) if pd.notna(row.get("exp_away_goals")) else pa
+    return eh, ea
+
+
+def _goal_metrics(row: pd.Series) -> dict[str, float | bool | None]:
+    required = ("actual_home_score", "actual_away_score", "pred_home_goals", "pred_away_goals")
+    if any(pd.isna(row.get(k)) for k in required):
+        return {"exact_score": None, "home_mae": None, "away_mae": None, "total_mae": None}
+    xg = _xg_values(row)
+    if xg is None:
+        return {"exact_score": None, "home_mae": None, "away_mae": None, "total_mae": None}
+    eh, ea = xg
+    ah = float(row["actual_home_score"])
+    aa = float(row["actual_away_score"])
+    ph = float(row["pred_home_goals"])
+    pa = float(row["pred_away_goals"])
     return {
         "exact_score": bool(ph == ah and pa == aa),
         "home_mae": abs(eh - ah),
@@ -87,8 +100,10 @@ def _print_match(row: pd.Series) -> None:
         f"pred {pred_score:<5} actual {actual:<7}  {result_tag}  {score_tag}"
     )
     if goals["total_mae"] is not None:
+        xg = _xg_values(row)
+        xg_str = f"{xg[0]:.2f}-{xg[1]:.2f}" if xg is not None else "—"
         print(
-            f"    xG {row['exp_home_goals']:.2f}-{row['exp_away_goals']:.2f}  "
+            f"    xG {xg_str}  "
             f"goal MAE {goals['total_mae']:.2f}  "
             f"draw prob {row['p_draw']*100:.1f}%"
         )

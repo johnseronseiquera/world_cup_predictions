@@ -11,14 +11,19 @@ python predict_today.py "Saudi Arabia" "Uruguay"
 ## Daily workflow
 
 ```bash
-python sync_results.py              # pull latest match results
+# Predict (predict_today / predict_slate sync results automatically)
 python sync_player_stats.py         # refresh club stats
-python import_fbref.py --dir data_cache/fbref_imports   # optional FBref import
-python predict_today.py "Spain" "Cabo Verde"            # single match
-python predict_slate.py 2026-06-19                      # all matches on a date
-python score_predictions.py           # fill in actual results in the prediction log
-python review_predictions.py          # sync, score, and print matchday report
-python backtest_goals.py              # validate goal model on past World Cups
+python predict_today.py "Spain" "Cabo Verde"
+python predict_slate.py 2026-06-19
+
+# After matchday — syncs results once, scores picks, prints report
+python review_predictions.py
+
+# Optional
+python sync_results.py              # manual results refresh (skip if you just ran review)
+python import_fbref.py --dir data_cache/fbref_imports
+python score_predictions.py         # score log only (review_predictions already does this)
+python backtest_goals.py
 ```
 
 ## How it works
