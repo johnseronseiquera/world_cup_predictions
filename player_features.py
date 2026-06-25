@@ -13,10 +13,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_DIR = SCRIPT_DIR.parent / "international_results"
 GOALSCORERS_PATH = DATA_DIR / "goalscorers.csv"
+GOALSCORERS_CACHE_PATH = SCRIPT_DIR / "data_cache" / "goalscorers.csv"
+GOALSCORERS_URL = "https://raw.githubusercontent.com/martj42/international_results/master/goalscorers.csv"
 SQUADS_PATH = SCRIPT_DIR / "data_cache" / "squads_2026.csv"
 CLUB_STATS_PATH = SCRIPT_DIR / "data_cache" / "player_club_stats.csv"
 
@@ -100,7 +103,17 @@ def normalize_team(name: str) -> str:
 
 
 def load_goalscorers(path: Path | None = None) -> pd.DataFrame:
-    path = path or GOALSCORERS_PATH
+    if path is None:
+        if GOALSCORERS_PATH.exists():
+            path = GOALSCORERS_PATH
+        else:
+            path = GOALSCORERS_CACHE_PATH
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                resp = requests.get(GOALSCORERS_URL, timeout=120)
+                resp.raise_for_status()
+                path.write_bytes(resp.content)
+                print(f"data updated via download -> {path}")
     g = pd.read_csv(path)
     g["date"] = pd.to_datetime(g["date"])
     for col in ("team", "home_team", "away_team"):
