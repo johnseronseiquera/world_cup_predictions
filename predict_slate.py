@@ -25,6 +25,7 @@ from predict_today import (
     attach_squad_lookup,
     build_dataset,
     build_squad_feature_lookup,
+    fetch_results,
     find_fixture,
     load_results,
     make_chart,
@@ -40,7 +41,7 @@ from player_features import load_goalscorers, load_squads, squad_match_features
 from sync_player_stats import sync_player_stats
 
 
-def fixtures_on_date(slate_date: str) -> list[tuple[str, str]]:
+def fixtures_on_date(slate_date: str, raw_results: pd.DataFrame | None = None) -> list[tuple[str, str]]:
     fx = pd.read_csv(FIXTURES_PATH)
     pairs: list[tuple[str, str]] = []
     for _, row in fx.iterrows():
@@ -53,6 +54,24 @@ def fixtures_on_date(slate_date: str) -> list[tuple[str, str]]:
         if any(w in teams.lower() for w in ["winner", "runner", "third", "place", "group"]):
             continue
         pairs.append((left, right))
+    if pairs:
+        return pairs
+
+    # Once knockout slots are resolved, the synced results feed has concrete
+    # team names even while fixtures.csv still contains bracket placeholders.
+    if raw_results is None:
+        raw_results = fetch_results(sync=False)
+    raw_results = raw_results.copy()
+    raw_results["date"] = pd.to_datetime(raw_results["date"], errors="coerce")
+    day = raw_results[
+        (raw_results["date"].dt.strftime("%Y-%m-%d") == slate_date)
+        & raw_results["tournament"].astype(str).str.fullmatch("FIFA World Cup", case=False, na=False)
+    ]
+    for _, row in day.iterrows():
+        home = str(row["home_team"]).strip()
+        away = str(row["away_team"]).strip()
+        if home and away and "nan" not in {home.lower(), away.lower()}:
+            pairs.append((home, away))
     return pairs
 
 
@@ -78,7 +97,9 @@ def print_match_result(m, p_home, p_draw, p_away, pick, conf, tag, goals, squad)
 
 def main() -> None:
     slate_date = sys.argv[1] if len(sys.argv) > 1 else str(date.today())
-    pairs = fixtures_on_date(slate_date)
+    print("Syncing latest match data ...")
+    raw_results = fetch_results(sync=True)
+    pairs = fixtures_on_date(slate_date, raw_results)
     if not pairs:
         print(f"No fixtures found for {slate_date}")
         return
