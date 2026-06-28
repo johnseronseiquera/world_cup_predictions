@@ -344,6 +344,32 @@ def _side_matches(user_input, raw_name):
     return u in {raw_name.strip().lower(), map_fixture_name(raw_name).strip().lower()}
 
 
+def _result_side_matches(user_input, raw_name):
+    """True if the user's typed team matches a raw results.csv side."""
+    u = user_input.strip().lower()
+    raw = str(raw_name).strip()
+    normalized = normalize_country(raw)
+    return u in {raw.lower(), str(normalized).strip().lower()}
+
+
+def _fixture_from_results_row(row):
+    city = str(row.get("city", "")).strip()
+    country = str(row.get("country", "")).strip()
+    location = ", ".join(p for p in [city, country] if p)
+    home_disp = str(row["home_team"]).strip()
+    away_disp = str(row["away_team"]).strip()
+    return {
+        "match": "",
+        "group": row.get("tournament", ""),
+        "stadium": location,
+        "date": str(pd.to_datetime(row["date"]).date()),
+        "home_disp": home_disp,
+        "away_disp": away_disp,
+        "home": normalize_country(home_disp),
+        "away": normalize_country(away_disp),
+    }
+
+
 def find_fixture(team_a, team_b):
     """Find the single fixture for the two named teams (order doesn't matter)."""
     fx = pd.read_csv(FIXTURES_PATH)
@@ -358,6 +384,20 @@ def find_fixture(team_a, team_b):
                     "stadium": row.get("stadium", ""), "date": row.get("date_dt", ""),
                     "home_disp": left, "away_disp": right,
                     "home": map_fixture_name(left), "away": map_fixture_name(right)}
+
+    # Knockout fixtures in fixtures.csv are placeholders until the bracket is known.
+    # The synced results feed includes those resolved fixtures with blank scores.
+    raw_results = fetch_results(sync=False)
+    raw_results["date"] = pd.to_datetime(raw_results["date"], errors="coerce")
+    raw_results = raw_results[
+        (raw_results["date"] >= pd.Timestamp("2026-06-01"))
+        & raw_results["tournament"].astype(str).str.fullmatch("FIFA World Cup", case=False, na=False)
+    ].sort_values("date")
+    for _, row in raw_results.iterrows():
+        forward = _result_side_matches(team_a, row["home_team"]) and _result_side_matches(team_b, row["away_team"])
+        reverse = _result_side_matches(team_a, row["away_team"]) and _result_side_matches(team_b, row["home_team"])
+        if forward or reverse:
+            return _fixture_from_results_row(row)
     return None
 
 
