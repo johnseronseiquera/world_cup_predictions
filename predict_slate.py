@@ -11,6 +11,7 @@ Trains once, then runs all group-stage matches scheduled for that day.
 
 from __future__ import annotations
 
+import csv
 import sys
 from datetime import date
 from pathlib import Path
@@ -54,7 +55,7 @@ def _is_placeholder_match(teams: str) -> bool:
     return any(token in teams.lower() for token in PLACEHOLDER_TOKENS)
 
 
-def _venue_from_result(row: pd.Series) -> str:
+def _venue_from_result(row) -> str:
     parts = [str(row.get(col, "")).strip() for col in ("city", "country")]
     return ", ".join(part for part in parts if part and part.lower() != "nan")
 
@@ -73,30 +74,30 @@ def _fixture_from_static_row(row: pd.Series, left: str, right: str) -> dict[str,
 
 
 def _fixtures_from_results(slate_date: str, results_path: Path) -> list[dict[str, str]]:
-    raw = pd.read_csv(results_path)
-    raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
-    slate = raw[raw["date"].dt.strftime("%Y-%m-%d") == slate_date].copy()
-    if "tournament" in slate.columns:
-        slate = slate[slate["tournament"].astype(str).str.lower().eq("fifa world cup")]
-
     fixtures: list[dict[str, str]] = []
-    for _, row in slate.iterrows():
-        home = str(row.get("home_team", "")).strip()
-        away = str(row.get("away_team", "")).strip()
-        if not home or not away or home.lower() == "nan" or away.lower() == "nan":
-            continue
-        fixtures.append(
-            {
-                "match": "",
-                "group": row.get("tournament", "FIFA World Cup"),
-                "stadium": _venue_from_result(row),
-                "date": slate_date,
-                "home_disp": home,
-                "away_disp": away,
-                "home": _model_team_name(home),
-                "away": _model_team_name(away),
-            }
-        )
+    with results_path.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row.get("date") != slate_date:
+                continue
+            tournament = row.get("tournament", "FIFA World Cup")
+            if tournament.lower() != "fifa world cup":
+                continue
+            home = str(row.get("home_team", "")).strip()
+            away = str(row.get("away_team", "")).strip()
+            if not home or not away or home.lower() == "nan" or away.lower() == "nan":
+                continue
+            fixtures.append(
+                {
+                    "match": "",
+                    "group": tournament,
+                    "stadium": _venue_from_result(row),
+                    "date": slate_date,
+                    "home_disp": home,
+                    "away_disp": away,
+                    "home": _model_team_name(home),
+                    "away": _model_team_name(away),
+                }
+            )
     return fixtures
 
 
