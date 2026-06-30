@@ -25,9 +25,11 @@ from predict_today import (
     attach_squad_lookup,
     build_dataset,
     build_squad_feature_lookup,
+    fetch_results,
     find_fixture,
     load_results,
     make_chart,
+    normalize_country,
     per_team_long,
     predict_goals,
     predict_symmetric,
@@ -56,6 +58,40 @@ def fixtures_on_date(slate_date: str) -> list[tuple[str, str]]:
     return pairs
 
 
+def resolved_matches_on_date(slate_date: str, raw_results: pd.DataFrame) -> list[dict]:
+    """Use synced future World Cup rows when fixtures.csv still has placeholders."""
+    results = raw_results.copy()
+    results["date"] = pd.to_datetime(results["date"])
+    results["home_team"] = results["home_team"].map(normalize_country)
+    results["away_team"] = results["away_team"].map(normalize_country)
+    matches = results[
+        (results["date"].dt.strftime("%Y-%m-%d") == slate_date)
+        & results["tournament"].astype(str).str.contains("FIFA World Cup", case=False, na=False)
+    ].copy()
+    if matches.empty:
+        return []
+
+    resolved: list[dict] = []
+    for _, row in matches.iterrows():
+        stadium = str(row.get("city", "") or "")
+        country = str(row.get("country", "") or "")
+        if country and country.lower() != "nan":
+            stadium = f"{stadium}, {country}" if stadium else country
+        resolved.append(
+            {
+                "match": "",
+                "group": "",
+                "stadium": stadium,
+                "date": slate_date,
+                "home_disp": row["home_team"],
+                "away_disp": row["away_team"],
+                "home": row["home_team"],
+                "away": row["away_team"],
+            }
+        )
+    return resolved
+
+
 def print_match_result(m, p_home, p_draw, p_away, pick, conf, tag, goals, squad):
     print("\n" + "=" * 60)
     print(f"  {m['home_disp']} vs {m['away_disp']}")
@@ -79,11 +115,13 @@ def print_match_result(m, p_home, p_draw, p_away, pick, conf, tag, goals, squad)
 def main() -> None:
     slate_date = sys.argv[1] if len(sys.argv) > 1 else str(date.today())
     pairs = fixtures_on_date(slate_date)
-    if not pairs:
+    raw_results = fetch_results(sync=True)
+    resolved_matches = resolved_matches_on_date(slate_date, raw_results) if not pairs else []
+    if not pairs and not resolved_matches:
         print(f"No fixtures found for {slate_date}")
         return
 
-    print(f"\nPredicting {len(pairs)} matches on {slate_date} ...")
+    print(f"\nPredicting {len(pairs) or len(resolved_matches)} matches on {slate_date} ...")
     results = load_results(sync=False)
     goalscorers = load_goalscorers()
     squads = load_squads()
@@ -109,11 +147,15 @@ def main() -> None:
     import os
     os.makedirs(out_dir, exist_ok=True)
 
+    fixture_matches = []
     for team_a, team_b in pairs:
-        m = find_fixture(team_a, team_b)
-        if m is None:
+        fixture = find_fixture(team_a, team_b)
+        if fixture is None:
             print(f"\nSkipping {team_a} vs {team_b} (fixture not found)")
             continue
+        fixture_matches.append(fixture)
+
+    for m in fixture_matches or resolved_matches:
         if m["home"] not in valid_teams or m["away"] not in valid_teams:
             print(f"\nSkipping {m['home_disp']} vs {m['away_disp']} (placeholder teams)")
             continue
