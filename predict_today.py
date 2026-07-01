@@ -340,8 +340,62 @@ def map_fixture_name(name):
 
 def _side_matches(user_input, raw_name):
     """True if the user's typed team matches a fixture side (by raw or mapped name)."""
-    u = user_input.strip().lower()
-    return u in {raw_name.strip().lower(), map_fixture_name(raw_name).strip().lower()}
+    user = user_input.strip()
+    user_names = {user, map_fixture_name(user), normalize_country(map_fixture_name(user))}
+    raw_names = {raw_name.strip(), map_fixture_name(raw_name), normalize_country(map_fixture_name(raw_name))}
+    return bool({n.lower() for n in user_names} & {n.lower() for n in raw_names})
+
+
+def _result_row_to_fixture(row):
+    city = "" if pd.isna(row.get("city", "")) else str(row.get("city", "")).strip()
+    country = "" if pd.isna(row.get("country", "")) else str(row.get("country", "")).strip()
+    stadium = ", ".join(part for part in [city, country] if part)
+    home = normalize_country(row["home_team"])
+    away = normalize_country(row["away_team"])
+    return {
+        "match": "",
+        "group": row.get("tournament", ""),
+        "stadium": stadium,
+        "date": str(pd.Timestamp(row["date"]).date()),
+        "home_disp": home,
+        "away_disp": away,
+        "home": home,
+        "away": away,
+    }
+
+
+def result_fixtures_on_date(slate_date: str):
+    """Resolved future World Cup fixtures from results.csv, including blank-score rows."""
+    raw = fetch_results(sync=False)
+    raw["date"] = pd.to_datetime(raw["date"])
+    raw["home_team"] = raw["home_team"].map(normalize_country)
+    raw["away_team"] = raw["away_team"].map(normalize_country)
+    day = pd.Timestamp(slate_date).normalize()
+    mask = (
+        raw["date"].dt.normalize().eq(day)
+        & raw["tournament"].astype(str).str.contains("FIFA World Cup", case=False, na=False)
+        & raw["home_score"].isna()
+        & raw["away_score"].isna()
+    )
+    return [_result_row_to_fixture(row) for _, row in raw.loc[mask].iterrows()]
+
+
+def _find_result_fixture(team_a, team_b):
+    raw = fetch_results(sync=False)
+    raw["date"] = pd.to_datetime(raw["date"])
+    raw["home_team"] = raw["home_team"].map(normalize_country)
+    raw["away_team"] = raw["away_team"].map(normalize_country)
+    unresolved = raw[
+        raw["tournament"].astype(str).str.contains("FIFA World Cup", case=False, na=False)
+        & raw["home_score"].isna()
+        & raw["away_score"].isna()
+    ].sort_values("date")
+    for _, row in unresolved.iterrows():
+        forward = _side_matches(team_a, row["home_team"]) and _side_matches(team_b, row["away_team"])
+        reverse = _side_matches(team_a, row["away_team"]) and _side_matches(team_b, row["home_team"])
+        if forward or reverse:
+            return _result_row_to_fixture(row)
+    return None
 
 
 def find_fixture(team_a, team_b):
@@ -358,7 +412,7 @@ def find_fixture(team_a, team_b):
                     "stadium": row.get("stadium", ""), "date": row.get("date_dt", ""),
                     "home_disp": left, "away_disp": right,
                     "home": map_fixture_name(left), "away": map_fixture_name(right)}
-    return None
+    return _find_result_fixture(team_a, team_b)
 
 
 def list_team_names():
