@@ -31,6 +31,7 @@ from predict_today import (
     per_team_long,
     predict_goals,
     predict_symmetric,
+    result_fixtures_on_date,
     split_by_date,
     tag_match,
     train_model,
@@ -53,6 +54,8 @@ def fixtures_on_date(slate_date: str) -> list[tuple[str, str]]:
         if any(w in teams.lower() for w in ["winner", "runner", "third", "place", "group"]):
             continue
         pairs.append((left, right))
+    if not pairs:
+        pairs = [(m["home_disp"], m["away_disp"]) for m in result_fixtures_on_date(slate_date)]
     return pairs
 
 
@@ -84,7 +87,7 @@ def main() -> None:
         return
 
     print(f"\nPredicting {len(pairs)} matches on {slate_date} ...")
-    results = load_results(sync=False)
+    results = load_results(sync=True)
     goalscorers = load_goalscorers()
     squads = load_squads()
     club_stats = sync_player_stats()
